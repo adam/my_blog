@@ -1,0 +1,90 @@
+h2. Entication Vs. Orization
+
+h3. Think a little different about auth
+
+
+Rails has us trained.  It's such an opinionated framework and it's creators are so revered for it that we just assume that the way it works is the 'right' way.  Take authentication for instance.  Technoweenie's Restful-Authentication
+plugin is the most suggested and common way of doing user authentication in a Rails application.
+
+Because Restful-Authentication is so commonly used, 'Rails Developers' will literally just assume that's the avenue they're going to take in their applications and force changes in their client's business logic to support it. This almost always happens without a second-thought and is likely a frustration for applications with specific needs.
+
+Restful-Authentication is so pervasive in the ruby web application community that when a new ruby framework comes out... namely Merb... people rush to port it over.  Daniel Neighman released "MerbAuth":http://merbunity.com/tutorials/13, a Merb-slice port of Restful-Authentication, in June to much excitement from the burgeoning Merb community.
+
+This is all fine and good....except that there are some very basic assumptions that Restful-Authentication makes that are flawed:
+
+# Authorization and authentication are tightly coupled 
+# Store the authentication state in a controller's instance variables
+# Redirect when the user isn't logged in or can't do something
+
+h4. MYTH #1 - Authorization and Authentication Are Tightly Coupled
+
+You'll very likely see an Authentication system traveling with an Authorization system; they're BFF's after all.  But if you think about these two systems in terms of how they differ in responsibilities, you find that they can be implemented separately with almost no regard for how the other is built.
+
+The responsibilities of an Authentication system is to prove a user's claimed identity is indeed his real identity.  There's quite a few approaches an Authentication system can go about doing this including trusted hosts, password verification, and trust networks (like 'Open-ID'). After the verification has occurred, the Authentication's system responsibilities are complete.
+
+Authorization takes a verified user from the Authentication system, without caring exactly _how_ that verification occurred, and answers the question "Can this user perform this action?". If no verified user exists, the answer is typically no.
+
+There's a couple of ways an authorization system goes about this: state of authentication, Role basis, and Permission basis.  The 'state of authentication' approach is the closest to the Authentication system that an Authorization system will ever get; it usually constitutes of one line of code that akin to @return true if authenticated?@.  All of the others look through an association that a user has and checks for the existence of a role, in the case of the role-based approach, or a permission which governs that action, in the case of the permission basis.
+
+When you draw the line between Authentication and Authorization, you realize that their implementations can vary without regard to how the other is implemented.  As long as the Authorization system can ask the Authentication system for the active user, you're good to go.
+
+h4. MYTH #2 - Store the Authentication State in a Controller's Instance Variables
+
+If you're using Restful Authentication, you're probably used to seeing calls to @current_user@ littered across all of your application's controllers.  It's a method off of your Application controller, from which all other controllers inherit, and is just an @attr_reader@ that spits back the 'current_user' instance variable on that controller.  In a @before_filter@, Restful Authentication retrieves the user by looking into the session and retrieving the @user_id@ and sticking it into an instance variable.
+
+My contention is that it's storing this retrieved identity in the wrong place.  Controllers are great places for defining algorithms that need to run when certain URIs are requested; They're horrible places to store state.  
+
+That's the job of the Session.
+
+If you haven't already guessed where I'm going with this, I propose cracking open the Session object and tacking on a few methods for authentication and authorization.  If you wanted to authenticate, you'd inform the session of the new user. If you wanted to see if there was an authenticated user, you'd ask the session.  If you wanted to get at the active user during a request, you'd ask the session.  If you wanted to log out, you'd delete the active user from the session.
+
+Talking to an instance variable off of a controller means that any changes to state would happen to the controller, which would then have to persist those changes into the session object for that request in a second step.  Why would you want to do that when you can talk directly to the session?
+
+h4. MYTH #3 - Redirect When the User Isn't Authenticated or Authorized
+
+When the Authentication or Authorization system comes back and says "nope", the common practice is to serve a 302 Redirect and point the user somewhere else like a login page or the previous page with an error message. According to the "HTTP Spec":http://www.ietf.org/rfc/rfc2616.txt, a 302 Redirect should be used only when "the requested resource resides temporarily under a different URI".  It doesn't say you can use it in the case of authentication or authorization.
+
+In fact, if you look a little harder, HTTP provides the 401 Unauthorized status-code for saying that the request requires authentication and the 405 Method Not Allowed status-code for saying that the action requested isn't allowed.  
+
+*If your web application serves a 302 when it should have served a 401 or 405, you're not complying with the HTTP spec and therefore doing something wrong.*
+
+This isn't to say that the user should not be shown a login screen if he needed to be authenticated, or an error message if he couldn't do something.  The error status-codes in HTTP can be sent with HTML bodies, so that's where you need to stick your response; not in another location which the browser needs to be redirected to.
+
+If your web application framework can't serve specific status-codes, or include a Body in with a non-200 response, then you need a new web application framework.
+
+h3. So What Am I Doing About It?
+
+Well, first I'm giving up completely on Rails.  Yup, no more Rails development for me.  Too bloated, too kludgy, too opinionated, and by far and away too egotistical.  Restful-Authentication isn't the main reason for this, of course, but one of many straws that broke the camel's back as far as things like this goes.
+
+Secondly, I'm working with Dan Neighman (yup, of "MerbAuth":http://merbunity.com/tutorials/13 fame) on an Authentication framework for Merb which is built without these myths about Authentication and Authorization included.  It won't tell you how to do your job; it won't force you into one way of doing auth or another; and it sure the hell won't break from the HTTP Specification.
+
+You can check out the beginnings, in the form of a demo app, at "http://github.com/adam/exceptionalauthentication/tree/master":http://github.com/adam/exceptionalauthentication/tree/master.  
+
+<hr>
+
+h3. Update (2008-09-05)
+
+
+Hassox has brought this basic approach into a rewrite of MerbAuth.
+  
+Check it out at "http://github.com/hassox/merb-auth/tree/master":http://github.com/hassox/merb-auth/tree/master
+
+<hr>
+
+One of the very spiffy things we're doing is letting you configure how you want authentication to cascade.  For example, you can configure your app to authenticate in the following order:
+
+# if the request came from an IP address within a certain subnet, the session is authenticated as an admin.
+# if the URL includes a GET param with a token in it, the session is authenticated by retrieving the User by this token.
+# if there's a session[:user_key], the session is authenticated by retrieving the User by this key.
+# if there's HTTP Basic Auth headers, hand them to a login strategy which uses them to retrieve a user.
+# if there's POST params with Auth info in them, hand them to a login strategy which uses them to retrieve a user.
+
+Inside of that, however, we've torn out any hardcoded aspects of what the @authenticate@ method actually does and replaced it with @fetch_user@ and @store_user@ methods so you can determine how you'd like to verify a claimed identity or store it in the Session object.  Want to use a Salted Password setup? Sure.  Want to use OpenID? Sure. Want to auth against an LDAP server? Sure. Want to use public/private keys in tokens in the URL? Sure.  Whatever you want, it's up to you and your application's needs.
+
+We're using Merb's Exceptions Controller to serve proper 401 Unauthorized headers when they should happen without redirecting the browser.  The login page resides in the method which handles the 401 Unauthorized so that a redirection isn't even needed.  The requested URL will stay the same, but they'll see a login page instead of the page they requested.
+
+Later, when we turn our attention to the Authorization portion of this, we'll serve 405 Method Not Allowed headers in the same way.  But if you're smart, and I hope you are, you'll never present the user with the ability to do something he's not allowed too do.
+
+We're even thinking hard about a @sudo su@-like mechanism for Authorization which would allow an admin to temporarily become another user and browse the site as that user.  When he logs out, we pop the user off a stack and he becomes the previous user again.  This idea is still marinating in the back of our heads, though, but we'd like to get there from here.
+
+But all this is still in the beginning stages of development and we have a long way to go before freeing you from the shackles of Restful Authentication and freeing you to build your application as you see fit, not as Rails forces.  If you want to help out, by all means, ping me.

@@ -1,0 +1,15 @@
+So I can't honestly bring myself to write in my blog anymore.  
+
+So, in order to preserve the content that I _did_ write, I've moved it over here to this github repo.  All the meat of the previous blog is here, minus some crap that probably shouldn't have been written anyway.
+
+* 5/13/2008 - Thoughts On DataMapper
+* 5/21/2008 - Remember Our Roots
+* 6/19/2008 - Query and Collection
+* 8/16/2008 - Entication Vs Orization
+* 8/18/2008 - Stuck On Fixtures
+
+Enjoy...I'm out.
+
+<hr/>
+
+PS. I may start writing again...if I feel like it....we'll see.  If you want to, your more than welcome to subscribe to the commit history of this git repo if you want to be notified when I change something or write a new article.  It's not going anywhere.

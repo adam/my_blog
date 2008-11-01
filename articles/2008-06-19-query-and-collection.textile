@@ -1,0 +1,120 @@
+h2. Query And Collection
+
+h3. Separating responsibilities lets you get away with murder
+
+
+I picked up my very own copy of "Martin Fowler's 'Patterns Of Enterprise Application Architecture'":http://martinfowler.com/eaaCatalog/ (henceforth referred to as the PoEAA) at my local Barnes & Noble earlier today.  The lady behind the counter who rang me up asked how summer-school was going;  I've been out of college and working as a professional for a while now, so the question was both flattering and a little confusing.  After a few really poor attempts at flirting with her, I left and parked it in the adjacent Starbucks, bought some coffee to help keep me awake, and cracked open the book.
+
+The awesome thing about books on design patterns is how insightful they are....but the problem with them is how dry and hard to read they are.  For example, the Gang Of Four's "Design Patterns: Element of Reusable Object-Oriented Software":http://www.amazon.com/Design-Patterns-Object-Oriented-Addison-Wesley-Professional/dp/0201633612/ref=pd_bbs_sr_1?ie=UTF8&s=books&qid=1214193243&sr=8-1 [GoF] was particularly awesome for how many patterns it describes in depth, but damn if it's not dry reading. I've replaced the Benedryl I usually take to help me to get to sleep at night with a chapter of the GoF.  Works great, I'm out like a light[1]
+
+While scanning the PoEAA in that Starbucks, I realized just how closely DataMapper follows quite a few of the 'application architecture' design pattern Fowler describes.  Even the name of the ORM is one of the design patterns in the book.  I had to drive home, crack open the DataMapper source, and draw the comparisons.
+
+Ends up, much of DataMapper is a direct case-study of the design patterns Fowler puts forth in the PoEAA.  Query, Identity Field, Record Set, Mapper, Identity Map, Lazy Load, even Active Record.  They're all there in one form or another.
+
+I'd like to highlight 3 of Fowler's patterns and where you can find them inside of DataMapper.  Query, Record Set, and Lazy Load:
+
+h3. Query
+
+The "Query Object":http://martinfowler.com/eaaCatalog/queryObject.html simply represents a question to be asked of the long-term persistent storage.  Here's Fowler's description:
+
+bq. A Query Object is an interpreter [Gang of Four], that is a structure of objects that can form itself into a SQL query. You can create this query by referring to classes and fields rather than tables and columns. In this way those who write the queries can do so independently of the database schema and changes to the schema can be localized in a single place.
+
+DataMapper::Query is almost word-for-word exactly what he's talking about.  It comes into play when you issue a call to @#all@ or @#first@ and stores up any conditions, inclusion, or order preference you specify.  Internally, it knows what model you called it off of and tells the Query which fields are needed in order to compose the objects requested.  
+
+For example, if we were wanting to ask the database for the 2nd page of users who are active, sorted by id descending, and including their activity, you'd issue
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  User.all(:active => true, :include => [:activity], \
+    :order => [:id.desc], :limit => 10, :offset => 10)
+</pre>
+
+Which would create a DataMapper::Query that was equivalent to:
+
+<pre>
+  -- SQL                               -- DataMapper::Query ivars
+  SELECT id, name, body                -- @fields
+  FROM users                           -- @model
+  JOIN activity ON users.id = activities.user_id
+                                       -- @links
+  WHERE users.active = true
+                                       -- @conditions
+  ORDER BY users.id DESC               -- @order
+  LIMIT 10                             -- @limit
+  OFFSET 10                            -- @offset
+</pre>
+
+But, as per the Query Object pattern in the PoEAA, all DataMapper::Query knows how to do is to translate itself into a real SQL query.  It doesn't need to know how to execute itself against the data-store; that's not it's responsibility.  DataMapper::Collection does that.
+
+h3. Record Set
+
+As we'll get to in a second, DataMapper is extremely lazy about when it does finally run the composed Query object against the data-store.  When that happens, the result set is stored in an instance of DataMapper::Collection, which is almost a word-for-word example of the "PoEAA's Record Set":http://martinfowler.com/eaaCatalog/recordSet.html pattern, but with a few added bonuses.
+
+Though Record Set is a pretty simple pattern to understand, DataMapper takes it a step further by storing the Query object which created it with the record set even after its been run against the data-store.  DataMapper::Collection also responds to @#all@ or @#first@ as well, meaning you can chain queries till the cows come home.
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  User.all(:active => true).all(:age.gte => 21).all(:state => 'utah')
+</pre>
+
+The DataMapper::Collection object which is created when you issue @User.all(:active => true)@ responds to @#all@ by pulling out it's query object, merging it with the newly created query object from @.all(:age.gte => 21)@, and then creating a new collection which then has it's @#all@ method called on it.  This is a prime example of Polymorphism at work.
+
+You eventually end up with a DataMapper::Collection whose query object represents @User.all(:active => true, :age.gte => 21, :state => 'utah')@ (the lowest common denominator of the combination of the three queries) and who still hasn't actually been executed against the database.
+
+h3. Lazy Load
+
+Yup, DataMapper still hasn't actually run the DataMapper::Query against the data-store, even after we call @Resource::all@.  DataMapper::Collection is actually what the PoEAA calls "Lazy":http://martinfowler.com/eaaCatalog/lazyLoad.htmland. It acts like a Record Set but procrastinates actually loading the entries until you call a kicker method like @#entries@, or @#count@. 
+
+DataMapper::Collection does such a good job of quacking like an Array that you would hardly ever guess that it's actually far more intelligent than that.  For example....
+
+h3. Sexiness
+
+@DataMapper::Collection#reverse@  will tell it's query to invert the declared ordering you specified:  @:order => [:id.desc]@ will become @:order => [:id.asc]@. @DataMapper::Collection#first@  will transform it's internal query into a @LIMIT 1@ query.  @DataMapper::Collection#last@ will combine the two by reversing the order of the query and then transforming it into a @LIMIT 1@ query and thereby returning the last entry.
+
+But DataMapper::Collection goes even farther and gives you the full power of Array#[].  You can issue @DataMapper::Collection#[]@ with just an index and it'll alter it's query by adding the appropriate @LIMIT@ and @OFFSET@ to pull that particular object out of the database.  Negative indexes work as well, but reverse the sorting order of the query.
+
+If you issue @DataMapper::Collection#[]@ with two integers or a range object, it'll figure out the appropriate @LIMIT@ and @OFFSET@ as well.  Again negative numbers or ranges work as you would expect them too.
+
+You can even @push@, @pop@, @shift@, @unshift@, @<<@, @delete@, and @delete_at@ on a DataMapper::Collection and it'll operate exactly like the Array method equivalents.  It is, ofcourse, slightly more complicated than that when the Collection object is layered underneath a OneToMany::Proxy (as is the case when your talking to an association).  
+
+In this situation, these methods actually queue up what the "PoEAA calls 'Unit of Work'":http://martinfowler.com/eaaCatalog/unitOfWork.html which describe what needs to happen to relate or orphan the object in question.  A Unit of Work will get executed when you issue a @#save@ later.
+
+But there's more....
+
+h3. You might want to sit down....
+
+The combination of DataMapper::Collection and DataMapper::Query together knows how to transmogrify into executions as well.  For example...and I love this example...Here's a 1-liner that accomplishes something the USA has been trying to do for years now
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  Person.all(:terrorist => true).all(:location => 'Middle East').destroy!
+</pre>
+
+And for the teenagers in the audience, this one goes out to you:
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  Person.all(:age.gte => 18).update!(:can_drink => true) 
+  # your local laws may vary
+</pre>
+
+
+DataMapper::Collection#destroy! and DataMapper::Collection#update! each only actually run 1 execution on the data-store, but it will be composed of the conditions, joins, limits, and offset as you define them in the DataMapper::Query stored internally.  If the DataMapper::Collection's entries have yet to be loaded, no big deal.
+
+h3. Breathe!
+
+To review, DataMapper follows quite a few design patterns that Martin Fowler defines in the PoEAA.  I didn't even have a chance to go into the "Identity Map":http://github.com/sam/dm-core/tree/master/lib/dm-core/identity_map.rb and "Identity Field":http://github.com/sam/dm-core/tree/master/lib/dm-core/property.rb#L154 patterns which are mission-critical concepts as well.  Perhaps in a later blog entry I'll flesh out their implementations in DataMapper, but for now I'll quit it with the technical details and let you breath.
+
+I'd like you to walk away with the impression that DataMapper is trying to stand on the shoulders of giants.  Following one or more design patterns, when applicable, makes an ORM very flexible and powerful and you should take a moment to crack open your choice in ORMs to see how many you can spot.
+
+Oh, and buy a copy of "Martin Fowler's Principles of Enterprise Application Architecture":http://www.amazon.com/Enterprise-Application-Architecture-Addison-Wesley-Signature/dp/0321127420/ref=pd_bbs_1?ie=UTF8&s=books&qid=1214204702&sr=8-1 to learn a couple of things from someone who knows his stuff.
+
+bq. Special thanks should be made to Dan Kubb, "Yehuda Katz":http://yehudakatz.com/, and anyone else in "irc://irc.freenode.net/#datamapper":irc://irc.freenode.net/#datamapper who helped out while I was drafting this entry.  
+
+<hr/>
+
+fn1. Russ Olsen wrote a great book where he demonstrated implementations of design patterns called "Design Patterns In Ruby":http://www.amazon.com/Design-Patterns-Ruby-Addison-Wesley-Professional/dp/0321490452, and it's far more accessible for rubyists wishing they had the time and..um..energy to get through a book on design patterns.  

@@ -1,0 +1,38 @@
+h2. Remember Our Roots
+
+h3. The first generation of 'Golden Geeks' needs us
+
+
+On the weekends I like to hang out in local cafes here in Dallas, TX and 'geek out' on a personal project or an open source project.  I have my usual spots but occasionally I visit somewhere new or somewhere I haven't been in a long
+time.
+
+Last weekend was no different.  I drove down the road from my apartment to a bakery on the corner of a street, parked it in the sole booth that had a power outlet nearby, ordered a snack, and started playing with the "faker" ruby-gem.
+
+After about an hour of fooling around, a gentleman walked by the booth, caught a glimpse of SQL flying by in my terminal, and asked what I was doing.  Being the friendly outgoing kind of a guy I am, I responded and we struck up a
+conversation.
+
+A few minutes later, I invited him to sit, order a drink, and "geek out" with me. We debated database servers, operating systems, programming languages, application design...pretty much anything geek we could come up with.
+
+The conversation (debate) lasted well into the wee hours of the night and ended when the bakery started mopping the floors at closing time and we realized we should probably go.
+
+This gentleman, Cris, is in his 50's and he reminisced about being involved in the early forks of the original UNIX operating systems.  He even pulled up "the unix family tree":http://www.levenez.com/unix/ and pointed at a branch in
+the 1970's and said "that was my team. I was there when that happened."
+
+It put a very human face to my travails in the technology industry.  Here was a guy that had a life-long career in the industry I'm just starting out in.
+
+But Cris falls squarely in the bracket "CNN Money recently labeled 'out of a job and out of luck'":http://money.cnn.com/2008/05/21/news/economy/olderworkers/index.htm?eref=rss_topstories : Seniors who are too young to retire, but too old to get a new job.
+
+And that's not fair, quite frankly.  The technology industry needs people as experienced and knowledgeable as Cris is.  He's seen alot in his years. Trends, languages, conventions, best practices and development techniques have
+come and gone in his time.  Imagine the resource these 'seniors for hire' could be for us younger folk?  Answers to "How have you solved similar problems in the past?" can be wonderfully insightful and should be worth
+serious money if all were right with the world.
+
+Now maybe these down-and-out geeks aren't the best fit for your open positions[1], but I highly suggest looking and seeing what you can find.  Accept their applications, invite them to an interview, seriously consider what they
+could bring to the table if they were on your team, and most importantly treat them with the respect they deserve for the many technical contributions they have made and could continue to make.
+
+They are the giants which we stand on the shoulders of.
+
+fn1. Perhaps a part time contribution may better fit your needs?
+
+<hr/>
+
+Cris specializes in UNIX administration, legacy hardware and software, database administration, and flight simulation technologies.  His resume is available at "http://phoenixcomm.net/~harrison/Cris_Harrison.html":http://phoenixcomm.net/~harrison/Cris_Harrison.html

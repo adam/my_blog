@@ -1,0 +1,224 @@
+posted 18 Aug 2008
+
+h2. Stuck On Fixtures
+
+h4. Talking 'bout model generation
+
+To do proper testing, you need to have a viable "known to be correct" data-set with which to test your application against.  But creating that data-set sucks because you have to be very careful and thorough when hand-writing it.  Plus if you ever change your database's schema, you have to go back and change ALL of your fixtures.
+
+This sucks.
+
+But you have options:
+
+h3. 1) You could NOT use Fixtures
+
+This is the most common approach to fighting with fixtures.  Rspec's Mock and Stub classes are really spoiling and take over where Fixtures left off pretty well.  Still, though, you have to build a mock object which fits your needs with sample data you come up with.  This isn't so bad.
+
+Don't get me wrong, Automated Testing on the whole is awesome and should be used.  But no amount of mocks or stubs will be able to tell you what will happen to the visual design when it's filled to the brim with data. Or if pagination breaks after the 1,000th row in the database. Or if query performance slows to a crawl as the database fills up.
+
+The only way to see what the app does when you have tons of data is to load tons of Fixtures into the database. And the only way to do that is hand-draw each row.
+
+This Sucks.
+
+h3. 2) You could use a few Fixtures, but use them over an over again.
+
+Basically, this is a compromise.  You still sort of acknowledge that you need a way of loading data into your database, but you don't fully commit to a complete tester data-set and thereby miss the boat entirely.  
+
+Again you miss out on what can happen when you have tons and tons of data.  You can attempt to use the same small fixture set over and over, but that won't reflect REAL data and you'll soon find yourself adding "just one more photo, this time a landscape one" or "just one more user, this time with an european phone number"....soon you'll have a huge fixture mess and be stuck in the same quagmire of brittle fixtures as before.
+
+This Sucks.
+
+h3. 3) You could use production data as your data-set
+
+This approach involves syncing your development database with the database running your production application.  It reflects real data because it IS real data.  You'll have rows in your data-set that reflect real user behavior doing real things with your application.
+
+That is if your application is already in production.  If not, this isn't an option.
+
+If you pull down a copy of the production database, suddenly you have a database FULL of real user data, real names, real home addresses, real phone numbers, real email address, real credit card numbers, real purchase history....
+
+Real privacy violation if anything were to happen to your computer.
+
+This Sucks.
+
+h2. The only option left...
+
+The only option left[1] is to write a random data generator that takes a pattern of what a proper record in your database looks like and generates data that fits that pattern.
+
+And that's what "Ben Burkert":http://benburkert.com/ did.
+
+"Randexp":http://downtowncartel.com/randexp-gem/ provides a means to define what random data should look like, not what it is exactly.  Basically, you "wield regular expressions" to describe data, and then call a @generate@ method off of them to get actual data that fits that pattern.  For example, if I wanted a random word, I would do
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  /\w+/.generate # => 'metallicize'
+</pre>
+
+If you can write a regex that matches the kind of data you want, you can generate random data that matches it.  He goes into much more detail than that at "http://downtowncartel.com/randexp-gem/":http://downtowncartel.com/randexp-gem/ which I highly suggest you read.
+
+Randexp[2] is ofcourse the first key to solving the problem of tester data.  The other part is a new DM-More gem from Ben called "DM-Sweatshop".  With it, you can define how a full object should look.  For example:
+
+<pre>
+  #!/usr/bin/env ruby
+  class Tag
+    include DataMapper::Resource
+    property :name, String, :key => true
+  end
+
+  Tag.fixture {{
+    :name => /\w+/.generate
+  }}
+</pre>
+
+This defines a basic pattern for what a @Tag@ looks like.  To generate an instance of @Tag@, simply call @Tag.generate@.  DM-Sweatshop even helps you out and provides an @.of@ method on integers and ranges. Calling @.of@ off of an integer will call the supplied block that many times. Calling @.of@ on a Range will pick a random number between the start and end of that range and call the supplied block that many times.
+
+<pre>
+  #!/usr/bin/env ruby
+  200.of {
+    Tag.generate
+  }
+
+  (200..300).of {
+    Tag.generate
+  }
+</pre>
+
+DM-Sweatshop also provides a @.pick@ method off of Arrays, Ranges, and DataMapper::Resource classes which will randomly pick out one of it's entries and return it.  With it, we can randomly apply tags to a newly generated blog Post:
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  class Post
+    include DataMapper::Resource
+    property :id,     Serial
+    property :title,  String, :length => 255
+    property :body,   Text
+      # intentionally keeping this example simple
+    has n, :tags
+  end
+
+  Post.fixture {{
+    :title => /[:sentence:]/.generate,
+    :body => (3..5).of { /[:paragraph:]/.generate }.join("\n\n"),
+    :tags => (10..20).of { Tag.pick }
+  }}
+
+  50.of { Post.generate }
+</pre>
+
+Now our database is full of 200+ tags and 50 posts, each of which are tagged somewhere between 10 and 20 times.  Do we care what these Tags or Posts are?  No, just that they match the patterns we set forth in our fixtures for them.
+
+This Rocks.
+
+h2. The More Advanced Stuff
+
+h3. What's with the double-curlies?
+
+I should take a moment to pause and explain the <code>{{ }}</code> because it's key to understanding what's going on.  The first <code>{ }</code> means your defining a block of code; the second is a hash which gets returned.  This comes in really handy when you need to prep something before creating a real object.  
+
+Say, for example, the Photo class has an @uploaded_data=@ method which takes an uploaded Tempfile and shuffles it into place on your asset host.
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  Photo.fixture {
+    upload = {
+      :tempfile => OpenStruct.new(
+      :path => ('path' / 'to' / "images" / (['image1', 'image2'].pick + ".png")))
+    }
+    {
+    :title => /[:sentence:]/.generate,
+    :caption => (1..2).of { /[:paragraph:]/.generate} }.join("\n\n"),
+    :tags => (10..20).of { Tag.pick },
+    :uploaded_data => upload
+  }}
+</pre>
+
+You see how we constructed an OpenStruct outside of the hash which responds like a Tempfile object? As long as the @fixture@ method returns a hash which maps to properties on your class, you're good to go.
+
+h3. Different fixtures for the same class
+
+The @fixture@ and the @generate@ method have an optional parameter for the name of the fixture.  If you don't provide it, the name @:default@ is assumed.  Say for instance that we need to generate posts with a really short title:
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  Post.fixture(:short_title) {{
+    :title => /[:word:]/.generate,
+    :body => (3..5).of { /[:paragraph:]/.generate }.join("\n\n"),
+    :tags => (10..20).of { Tag.pick }
+  }}
+
+  Post.generate(:short_title)
+</pre>
+
+h3. Dates and Times
+
+One of the first applications of DM-Sweatshop I ever wrote was for a blog which featured publication logic.  Posts "go live" on a certain schedule configured by the author and aren't available before their appointed @published_at@ date.
+
+In order to generate a bunch of Posts, I had to figure out how to come up with random dates or times and the best option I came up with was:
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  def random_time(start_time, end_time)
+    Time.at((start_time.to_i..end_time.to_i).pick)
+  end
+
+  # then in the fixture
+  :published_at => random_time(Time.now - 2.years, Time.now + 2.years)  
+</pre>
+
+h3. Random Files in a Directory
+
+This is mostly just helpful, but you can randomly pick a file in a directory with the following little helper
+
+<pre>
+  #!/usr/bin/env ruby
+  
+  def pick_file(path)
+    Dir.entries(path).reject{|c| c[0].chr == '.'}.map{ |c|
+      path / c
+    }.pick
+  end
+
+  Photo.fixture {
+    upload = {
+      :tempfile => OpenStruct.new(
+      :path => pick_file("path" / "to" / "pile" / "of" / "photos"))
+    }
+    # ...
+  }}
+</pre>
+
+I keep around a collection of LOLCats specifically for such instances.
+
+h3. Warning
+
+If you generate models inside another model's fixture(s), you will potentially see data generation slow down and you may even trigger an infinite-loop if one model's generation fires another which fires another which fires another.  Pretty soon you'll either run out of memory or generate WAY more data per run than you originally intended.  
+
+The way to avoid situations like this is to generate your supporting models (like the Tags model in the previous example) first, and then only ever @pick@ from the generated tags inside other fixtures. The @pick@ will retrieve a random previously-generated object of that type, so if you don't have anything generated when you @pick@, it won't return anything.
+
+The other caveat you might....and I mean _might_....run into occurs when you generate MASSIVE amounts of data.  DM-Sweatshop will track in memory any data you generate so if you spin up DM-Sweatshop and tell it to generate, say, 300,000 records you'll likely hit the memory wall.  For > 100,000 records, you may want to run a your fixture generation script a couple of time instead.
+
+A softer caveat is that you'll likely be spoiled by how much content is on your site and never actually get to developing and testing HOW that content should be uploaded.  DM-Sweatshop can't really help you in that regard, but a careful eye to detail and test-coverage will.
+
+h2. Conclusions
+
+As far as 'best practices' or conventions go, a fixtures.rb file next to your spec_helper.rb file should do pretty well in keeping your fixtures organized and readily available.  Also, I would suggest adding some custom rake tasks to setup, fill, and teardown your database.  I like to go with @app:setup app:fill app:teardown@ myself, but it's really up to you and your application's needs.
+
+Returning to my criticisms of Fixtures with other ORMS, let's examine my complaints and see how DM-Sweatshop compares.
+
+First, I whined about how changes in your database's schema can royally flummox any hand-generated fixtures, but since we're not hand-generating fixtures, this is moot.  DM-Sweatshop lets you define _how_ data should look, not what exactly that data is.  Since you're only defining what a row looks like in one or a few places, changes in schema aren't near as painful.
+
+Second, I grumbled that you have to write a bunch of fixtures by hand if you want to reveal how your application design scales.  With DM-Sweatshop, you define the pattern once (or a few times) and then tell it how many fixtures you need. No more by-hand generation.
+
+Lastly, I pointed out the risk of privacy violations when cloning production data into your development database.  This is easily the most common approach to having data to play with during development, but it's also the one with the most legal repercussions should something horrible happen.  Save yourself the heart-ache and sorrow and use randomly generated data instead.
+
+Basically speaking, DM-Sweatshop is the only approach to test-data that doesn't suck.
+
+<hr/>
+
+fn1. Technically, there's another approach: Manage your fixtures with migrations.  I'm not going to cover this because it adds more complexity, not less and therefore == fail.
+
+fn2. Randexp does have the caveat of only being able to run on a *nix or Mac OSX. If you use a lesser operating system, you may be SOL.

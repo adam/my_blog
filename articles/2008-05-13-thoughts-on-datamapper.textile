@@ -1,0 +1,50 @@
+h2. Thoughts On Datamapper
+
+h3. Background and Anatomy of DataMapper
+
+I've had many a conversation with Sam about the target audience for DataMapper and he's stressed time and time again that DataMapper is meant to scratch itches that ActiveRecord chooses not to (or in some cases cannot at all). Sam's an ex-.NET developer and there's no better example of a platform specifically targeted at the enterprise than .NET.
+
+This means that DataMapper is (or will be) more 'enterprise-y' than ActiveRecord, which was born from a need to rapidly prototype an application, but that's Rails' big draw, really.  Here's a clean, simple, and fast way to get your idea into users' browsers PDQ(Pretty Darn Quick) and monetize their eyeballs or fingertips.
+
+But it's been four years since Rails hit the scene and the entrepreneurs who wrote the first Rails applications now have massive user-bases and a geek following that turns each blog entry its developers write into gospel.  If they complain about certain aspects of Rails, suddenly all the "rails developers" have second thoughts as well.  You see, they dream of their _yet another social network_ competing with MySpace or Facebook and if their role models start whining about scaling issues, they think twice.
+
+And with "the frequency of 'rails sucks' blog entries":http://blogsearch.google.com/blogsearch?hl=en&q=rails%20sucks&um=1&ie=UTF-8&sa=N&tab=wb rising, so too is the demand for a better solution rising.  This is exactly what alternative frameworks and libraries like DataMapper are tapping into. They're meant for the people who fell in love with Ruby but fell out of love with Rails, or for the people who looked longingly from another language or platform towards Ruby, or for the people who took one hard look at an existing library or framework and did not find their itch getting scratched.
+
+Still, the press machine that is Rails and its core team will command a blinding spotlight for many development cycles to come, and as such, it's the number 1 stop on the path developers take towards alternative Ruby frameworks
+and libraries.
+
+DataMapper has a long way to go before it becomes the "Hey, let's give up on this PHP or .NET thing and write our app in Ruby because DataMapper looks awesome" enticement that Rails is.  Due to this 'second fiddle' nature, DataMapper cannot stray too far from the opinions that Rails and specifically ActiveRecord established without risking being completely marginalized.
+
+Sometimes this means simply aliasing methods to ease peoples' pains in learning a new ORM, but other times it means supporting a feature that doesn't actually make much sense to keep as part of the library. 
+
+For this reason alone, DataMapper took a note from Merb's book and split into two separate projects: DM-Core, DM-More.  This architecture gives the development team behind DataMapper a place to put things that don't quite fit in as well as letting architects only include what they need to get their job done and not force unwieldy parts down anyone's throats.  The goal, if you'll remember, is *speed* and scalability.
+
+h3. DM-Core
+
+This is where the heart of DataMapper is.  Items include Repository, Resource, Properties, the Identity Map, Associations, Query, the primitive Data Types and anything else that constitutes the very bare minimums needed to create, review, update, relate, and delete objects.
+
+A few very interesting members also make roost here.  For example, you'll find DataMapper's support for Single Table Inheritance here, as well as Paranoia and a NamingConvention class which helps ease the pain of supporting data-stores designed using odd or non-standard conventions (or complete lack of convention all together).
+
+You won't find @count@ (and it's fellows) in DM-Core for a couple of reasons.  First, results returned by a calculation query don't map directly to a result set of objects.  You are requesting summary statistics about rows in a table, not the actual rows themselves.  Secondly, not all data-stores can support calculation queries near as well as a database can.  Many adapters may not even be able to provide summary statistics without grinding one's computer to a halt un-marshaling objects, calling a getter, storing the getter into an aggregation, and then moving on.
+
+Calculation Queries were one of the first things to move out of DM-Core and into DM-More during 'The Great Refactoring'.
+
+h3. DM-More
+
+This is where things that extend DataMapper into the realm of real application development can be found. Items include calculation queries, specialty adapters for particularly wild data-stores, a command line interface, support for non-relational data structure like trees, migrations, specialty 'serializers' like xml and json, meta timestamps like @created_at@ and @updated_at@, specialty data types like Enum and CSV, validations, session support, and anything else that clothes the bare essentials in DM-Core with useful but not always essential features.
+
+
+bq. I'm not sure that <code>merb_datamapper</code> belongs in DM-More because it doesn't so much extend the functionality of DM-Core as it integrates DM with a completely separate library.  For a while, there was talk of a DM-Plugins collection.  Perhaps this would be a location where integration gems like <code>merb_datamapper</code> would go.
+
+The average developer using DataMapper as their ORM will have quite a few gems from DM-More included into his/her project but certainly not all of them.  The usual assortment would likely be
+
+* dm-validations - prevents malformed or missing data
+* dm-timestamps - records meta-data about when activities were performed on a certain object
+* dm-aggregates - @count@, @min@, @max@, @avg@...
+* dm-migrations - stores information about how a data-store changes over time
+
+h3. All That Just to Wind up Here
+
+Change, as always, is inevitable.  These days, a tutorial or code-snippet posted beyond 2 weeks ago is likely out of date and in need of revision.  That's how fast and active the communities are surrounding these alternative frameworks.  They've learned alot about community management, communication, and organization from Rails, as well as benefited from being able to think long and hard about scalability issues facing other libraries.
+
+Thoughtful design is back!
