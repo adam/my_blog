@@ -1,3 +1,5 @@
+!http://github.com/adam/my_blog/tree/master/assets/pixel.jpg(Pixel)!
+
 So I can't honestly bring myself to write in my blog anymore.  
 
 So, in order to preserve the content that I _did_ write, I've moved it over here to this github repo.  All the meat of the previous blog is here, minus some crap that probably shouldn't have been written anyway.
