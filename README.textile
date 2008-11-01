@@ -1,4 +1,6 @@
-!http://github.com/adam/my_blog/tree/master/assets/pixel.jpg(Pixel)!
+<div style="float:right">
+!http://github.com/adam/my_blog/tree/master%2Fassets%2Fpixel.jpg?raw=true(Pixel)!
+</div>
 
 So I can't honestly bring myself to write in my blog anymore.  
 
